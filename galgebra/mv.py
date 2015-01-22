@@ -946,7 +946,10 @@ class Mv(object):
                     value = self.obj / norm
                     return Mv(cos(norm) + sin(norm) * value, ga=self.Ga)
                 else:
-                    return Mv(S(1), 'scalar', ga=self.Ga)
+                    if self==S(0):
+                        return Mv(S(1), 'scalar', ga=self.Ga)
+                    else:
+                        return Mv(S(1)+self, ga=self.Ga) # self may just be null, rather than 0
             else:
                 norm = metric.square_root_of_expr(sq)
                 value = self.obj / norm
@@ -955,7 +958,7 @@ class Mv(object):
                 else:
                     return Mv(cos(norm) + sin(norm) * value, ga=self.Ga)
         else:
-            raise ValueError('"' + str(self) + '**2" is not a scalar in exp.')
+            raise ValueError('"(' + str(self) + ')**2" is not a scalar in exp.')
 
     def set_coef(self, igrade, ibase, value):
         if self.blade_rep:
