@@ -10,7 +10,7 @@ from itertools import combinations
 #from numpy.linalg import matrix_rank
 from sympy import Symbol, Function, S, expand, Add, Mul, Pow, Basic, \
     sin, cos, sinh, cosh, sqrt, trigsimp, \
-    simplify, diff, Rational, Expr, Abs, collect, combsimp
+    simplify, diff, Rational, Expr, Abs, collect, combsimp, oo
 from sympy import N as Nsympy
 import printer
 import metric
@@ -959,6 +959,65 @@ class Mv(object):
                     return Mv(cos(norm) + sin(norm) * value, ga=self.Ga)
         else:
             raise ValueError('"(' + str(self) + ')**2" is not a scalar in exp.')
+
+    def scalar_multiple_of(self, A):
+        """Test if this Mv is a scalar multiple of another, and return multiple if so
+
+        This tests if this Mv `self` can be written as
+
+          self = s * A
+
+        where `s` is a scalar and `A` is the other Mv.  If so, the quantity
+        returned will be the scalar `s`.  [Note that `s` will be 0 if `self` is
+        0, even if `A` is also 0.]  If that is impossible, the return value
+        will be sympy.nan.  [Note that you can test for sympy.nan with `==`,
+        which isn't true of float NaNs.]
+
+        """
+        # This is a helper function for the general exponential function, where
+        # we need to search for pairs that are scalar multiples of each other.
+        # When A is an Mv, we have 9 cases to consider:
+        #
+        #                | self==S(0) | self.is_scalar() |  else
+        # ---------------------------------------------------------
+        #  A==S(0)       |  case 0a   |     case 0b      | case 0c
+        #  A.is_scalar() |  case 1a   |     case 1b      | case 1c
+        #  else          |  case 2a   |     case 2b      | case 2c
+        #
+        from sympy import nan
+        if self.is_scalar() and self.obj==S(0): # case 0a, case 1a, case 2a
+            return S(0)
+        if not isinstance(A, Mv):
+            if not self.is_scalar():
+                return nan
+            else:
+                return (self.obj / A) # try this...
+        if self.is_scalar() and not A.is_scalar(): # case 2b
+            return nan
+        if A.is_scalar():
+            if A.obj==S(0) or not self.is_scalar(): # case 0b, case 0c, case 1c
+                return nan # We already know self is not 0
+            else: # case 1b
+                return (self.obj / A.obj)
+        # The only case left is 2c, which is the interesting one:
+        if self.is_blade_rep != A.is_blade_rep:
+            self = self.blade_rep()
+            A = A.blade_rep()
+        coefs_self, bases_self = metric.linear_expand(self.obj)
+        coefs_A, bases_A = metric.linear_expand(A.obj)
+        if len(bases_self) != len(bases_A):
+            return nan
+        if set(bases_self) != set(bases_A):
+            return nan
+        # Re-order coefs_A to ensure it's in the same order as coefs_self
+        coefs_A = [coefs_A[bases_A.index(base)] for base in bases_self]
+        # We are assured that coefs_* will be nonempty, and each coef will be
+        # nonzero, so we can do this:
+        s = simplify(coefs_self[0] / coefs_A[0])
+        for i in range(1,len(coefs_self)):
+            if simplify((coefs_self[i] / coefs_A[i]) - s) != 0:
+                return nan
+        return s
 
     def set_coef(self, igrade, ibase, value):
         if self.blade_rep:
