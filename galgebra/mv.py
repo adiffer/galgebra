@@ -11,7 +11,7 @@ from itertools import combinations
 from sympy import Symbol, Function, S, expand, Add, Mul, Pow, Basic, \
     sin, cos, sinh, cosh, sqrt, trigsimp, \
     simplify, diff, Rational, Expr, Abs, collect, combsimp, \
-    nan, factorial, summation
+    oo, nan, factorial, summation, Wild, I, exp_polar, exp, summation
 from sympy import N as Nsympy
 import printer
 import metric
@@ -1021,15 +1021,16 @@ class Mv(object):
             # found above, and so should be real numbers.  Unfortunately, sympy
             # doesn't always simplify expressions to real numbers, even when it
             # should be possible [especially simple things like exp(I*pi/4)].
-            # So we try really hard to simplify.
+            # So we try hard to simplify, but not too hard because the
+            # expressions have a tendency of exploding.
             def expand_imag_exp(expr):
-                a = sympy.Wild('a')
-                expr = expr.replace(sympy.exp_polar(sympy.I*a), sympy.cos(a)+sympy.I*sympy.sin(a))
-                expr = expr.replace(sympy.exp(sympy.I*a), sympy.cos(a)+sympy.I*sympy.sin(a))
-                expr = sympy.simplify(expr)
-                expr = expr.replace(sympy.exp_polar(sympy.I*a), sympy.cos(a)+sympy.I*sympy.sin(a))
-                expr = expr.replace(sympy.exp(sympy.I*a), sympy.cos(a)+sympy.I*sympy.sin(a))
-                return sympy.simplify(expr)
+                a = Wild('a')
+                expr = expr.replace(exp_polar(I*a), cos(a)+I*sin(a))
+                expr = expr.replace(exp(I*a), cos(a)+I*sin(a))
+                expr = simplify(expr)
+                expr = expr.replace(exp_polar(I*a), cos(a)+I*sin(a))
+                expr = expr.replace(exp(I*a), cos(a)+I*sin(a))
+                return simplify(expr)
             s = simplify(s) # This probably won't be too complicated anyway...
             # print(s,i1,i2); sys.stdout.flush()
             k = Symbol('k', integer=True)
