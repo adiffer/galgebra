@@ -926,13 +926,25 @@ class Mv(object):
         """
         return Mv(self.Ga.Diff(self, mode, left, coords=coords), ga=self.Ga)
 
-    def exp(self, hint='+'):  # Calculate exponential of multivector
-        """
-        Only works if square of multivector is a scalar.  If square is a
-        number we can determine if square is > or < zero and hence if
-        one should use trig or hyperbolic functions in expansion.  If
-        square is not a number use 'hint' to determine which type of
-        functions to use in expansion
+    def exp(self, hint='+'):
+        """Calculate exponential of multivector
+
+        Only works reliably if square of multivector is a scalar.  If square is
+        a number we can determine if square is > or < zero and hence if one
+        should use trig or hyperbolic functions in expansion.  If square is not
+        a number (but a symbolic expression) use 'hint' to determine which type
+        of functions to use in expansion.
+
+        When the square of the input is not a multivector, we try a more
+        general approach, which relies on some power of the multivector being a
+        scalar multiple of a lower power.  In this case, we can separate the
+        usual series used to define the exponential into series for each term
+        between those two powers, which can be evaluated analytically by sympy.
+        Note that in this case, sympy may not be good at simplifying the
+        coefficients, and complex numbers may appear.  This does not mean that
+        the coefficients are complex; it simply means that sympy was not able
+        to simplify enough.
+
         """
         self_sq = self * self
         if self_sq.is_scalar():
@@ -982,8 +994,9 @@ class Mv(object):
                     # The series terminates at a finite power, so we can just
                     # do it explicitly:
                     return sum(P)
-                for k in range(len(P)): # Look for repeats (up to scalar multiple)
+                for k in range(j): # Look for repeats (up to scalar multiple)
                     s = P[j].scalar_multiple_of(P[k])
+                    # print(j,k,s); sys.stdout.flush()
                     if s != nan:
                         # If P[j] is a scalar multiple of some earlier P[k],
                         # then P[j+1] would be the same scalar multiple of
@@ -995,6 +1008,8 @@ class Mv(object):
                         i1 = k
                         i2 = j
                         break
+                if s != nan:
+                    break
 
             # That might not have turned up any repetitions
             if s==nan:
@@ -1015,9 +1030,10 @@ class Mv(object):
                 expr = expr.replace(sympy.exp_polar(sympy.I*a), sympy.cos(a)+sympy.I*sympy.sin(a))
                 expr = expr.replace(sympy.exp(sympy.I*a), sympy.cos(a)+sympy.I*sympy.sin(a))
                 return sympy.simplify(expr)
-            s = simplify(s)
+            s = simplify(s) # This probably won't be too complicated anyway...
+            # print(s,i1,i2); sys.stdout.flush()
             k = Symbol('k', integer=True)
-            coefficients = [expand_imag_exp(summation(s**j / factorial(j + k*(i2-i1)), (k,0,oo)))
+            coefficients = [expand_imag_exp(summation(s**k / factorial(j + k*(i2-i1)), (k,0,oo)))
                             for j in range(i1,i2)]
 
             # Finally, we can return the sum, including the finite number of
