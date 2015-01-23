@@ -10,7 +10,8 @@ from itertools import combinations
 #from numpy.linalg import matrix_rank
 from sympy import Symbol, Function, S, expand, Add, Mul, Pow, Basic, \
     sin, cos, sinh, cosh, sqrt, trigsimp, \
-    simplify, diff, Rational, Expr, Abs, collect, combsimp, oo
+    simplify, diff, Rational, Expr, Abs, collect, combsimp, \
+    nan, factorial, summation
 from sympy import N as Nsympy
 import printer
 import metric
@@ -950,7 +951,7 @@ class Mv(object):
                         return Mv(S(1), 'scalar', ga=self.Ga)
                     else:
                         return Mv(S(1)+self, ga=self.Ga) # self may just be null, rather than 0
-            else:
+            else: # `sq` is a symbolic expression
                 norm = metric.square_root_of_expr(sq)
                 value = self.obj / norm
                 if hint == '+':
@@ -958,7 +959,72 @@ class Mv(object):
                 else:
                     return Mv(cos(norm) + sin(norm) * value, ga=self.Ga)
         else:
-            raise ValueError('"(' + str(self) + ')**2" is not a scalar in exp.')
+            # We have to treat this case more generally, by looking at what the
+            # higher powers of `self` do.  At some point, they should start
+            # repeating themselves, and we can use that to write some
+            # `sympy.summation` statements and figure out how the exponential
+            # should come out.
+
+            P = [Mv(S(1), 'scalar', ga=self.Ga)] # P will contain integer powers of `self`
+            i1 = 0 # This will be the index of the first element in the repeating set
+            i2 = 0 # This will be the index of the first repeat of that first element
+            s = nan # This will be the scalar multiple of the repeats
+
+            # TODO: Think more about the upper limit of this range.  It
+            # represents the largest power of `self` for which that power
+            # should be a scalar multiple of some lower power.  I can't think
+            # of any useful example for which it needs to be larger than 4, but
+            # there's no harm making it bigger, unless the algorithm will fail
+            # anyway.
+            for j in range(1,self.Ga.n):
+                P.append( P[-1]*self )
+                if P[-1]==S(0):
+                    # The series terminates at a finite power, so we can just
+                    # do it explicitly:
+                    return sum(P)
+                for k in range(len(P)): # Look for repeats (up to scalar multiple)
+                    s = P[j].scalar_multiple_of(P[k])
+                    if s != nan:
+                        # If P[j] is a scalar multiple of some earlier P[k],
+                        # then P[j+1] would be the same scalar multiple of
+                        # P[k+1], and so on.  From here to infinity, the series
+                        # would just repeat with higher powers of this scalar
+                        # multiple.  So we can factor out the multivectors, and
+                        # just evaluate the series of scalars to find the full
+                        # exponential.
+                        i1 = k
+                        i2 = j
+                        break
+
+            # That might not have turned up any repetitions
+            if s==nan:
+                raise ValueError('Could not find repeating powers of (' + str(self) + ') in exp.\n'
+                                 'Maybe you need to increase the range of the loop looking for repeats.')
+
+            # Now, we calculate the coefficients of the various terms involved
+            # in the repetition.  These are just sums involving the scalar `s`
+            # found above, and so should be real numbers.  Unfortunately, sympy
+            # doesn't always simplify expressions to real numbers, even when it
+            # should be possible [especially simple things like exp(I*pi/4)].
+            # So we try really hard to simplify.
+            def expand_imag_exp(expr):
+                a = sympy.Wild('a')
+                expr = expr.replace(sympy.exp_polar(sympy.I*a), sympy.cos(a)+sympy.I*sympy.sin(a))
+                expr = expr.replace(sympy.exp(sympy.I*a), sympy.cos(a)+sympy.I*sympy.sin(a))
+                expr = sympy.simplify(sympy.expand_complex(sympy.simplify(expr)))
+                expr = expr.replace(sympy.exp_polar(sympy.I*a), sympy.cos(a)+sympy.I*sympy.sin(a))
+                expr = expr.replace(sympy.exp(sympy.I*a), sympy.cos(a)+sympy.I*sympy.sin(a))
+                return sympy.simplify(sympy.expand_complex(sympy.simplify(expr)))
+            s = simplify(s)
+            k = Symbol('k', integer=True)
+            coefficients = [expand_imag_exp(summation(s**j / factorial(j + k*(i2-i1)), (k,0,oo)))
+                            for j in range(i1,i2)]
+
+            # Finally, we can return the sum, including the finite number of
+            # elements that were not involved in the repetition (the first sum
+            # below), as well as the terms that did repeat, multiplied by the
+            # appropriate coefficient (the second sum below)
+            return sum(P[:i1]) + sum([c*m for c,m in zip(coefficients,P[i1:i2])])
 
     def scalar_multiple_of(self, A):
         """Test if this Mv is a scalar multiple of another, and return multiple if so
