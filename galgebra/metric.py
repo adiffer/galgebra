@@ -96,7 +96,7 @@ def square_root_of_expr(expr):
     value of the number is returned.
     """
     if expr.is_number:
-        if expr > 0:
+        if expr >= 0:
             return(sqrt(expr))
         else:
             return(sqrt(-expr))
