@@ -294,7 +294,7 @@ class GaPrinter(StrPrinter):
     def _print_Function(self, expr):
         name = expr.func.__name__
 
-        if expr.func.nargs is not None:
+        if (expr.args):
             if name in GaPrinter.function_names:
                 return(expr.func.__name__ + "(%s)" % self.stringify(expr.args, ", "))
 
