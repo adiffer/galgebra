@@ -926,30 +926,46 @@ class Mv(object):
         """
         return Mv(self.Ga.Diff(self, mode, left, coords=coords), ga=self.Ga)
 
-    def exp(self, hint='+'):
+    def exp(self, hint=None, power_search_limit=None):
         """Calculate exponential of multivector
 
-        Only works reliably if square of multivector is a scalar.  If square is
-        a number we can determine if square is > or < zero and hence if one
-        should use trig or hyperbolic functions in expansion.  If square is not
-        a number (but a symbolic expression) use 'hint' to determine which type
-        of functions to use in expansion.
+        Uses the standard expression whenever the square of the `Mv` is a
+        scalar.  If that square is a number (rather than a symbolic expression)
+        we can determine if the square is positive or negative and hence if one
+        should use trig or hyperbolic functions in the expansion.
+
+        If the square is not a number (but a symbolic expression) .
+
+        Optionally, for backward compatibility, use `hint` to determine which
+        type of functions to use in expansion.  Passing `hint='+'` indicates
+        that the square is positive, and hence hyperbolic functions should be
+        used; anything else indicates that the square is negative, and hence
+        trigonometric functions should be used.
 
         When the square of the input is not a multivector, we try a more
-        general approach, which relies on some power of the multivector being a
-        scalar multiple of a lower power.  In this case, we can separate the
-        usual series used to define the exponential into series for each term
-        between those two powers, which can be evaluated analytically by sympy.
-        Note that in this case, sympy may not be good at simplifying the
-        coefficients, and complex numbers may appear.  This does not mean that
-        the coefficients are complex; it simply means that sympy was not able
-        to simplify enough.
+        general approach, which relies on some power (i2) of the multivector
+        being a scalar multiple of a lower power (i1).  In this case, we can
+        separate the usual series used to define the exponential into series
+        for each term between those two powers, which can be evaluated
+        analytically by sympy.  Note that in this case, sympy may not be good
+        at simplifying the coefficients, and complex numbers may appear.  This
+        does not mean that the coefficients are complex; it simply means that
+        sympy was not able to simplify enough.
+
+        The optional argument `power_search_limit` is used when the square of
+        the multivector is not a scalar.  The algorithm will search for the
+        first power of the multivector that is a scalar multiple of a smaller
+        power, up to this limit.  By default, the limit is the dimension of the
+        vector space on which the geometric algebra is based.  If the scalar
+        multiple is found at a lower power than the limit, the search stops, so
+        there is no particular harm in making the limit quite large, as long as
+        you are confident that the scalar multiple will be found.
 
         """
         self_sq = self * self
         if self_sq.is_scalar():
             sq = self_sq.obj
-            if sq.is_number:
+            if sq.is_number: # `sq` is not a symbolic expression
                 if sq > S(0):
                     norm = sqrt(sq)
                     value = self.obj / norm
@@ -962,14 +978,16 @@ class Mv(object):
                     if self==S(0):
                         return Mv(S(1), 'scalar', ga=self.Ga)
                     else:
-                        return Mv(S(1)+self, ga=self.Ga) # self may just be null, rather than 0
-            else: # `sq` is a symbolic expression
+                        # `self` may just be null, rather than 0, in which case
+                        # `1+self` is the correct exponential
+                        return Mv(S(1)+self, ga=self.Ga)
+            else: # `sq` is a (nonzero) symbolic expression
                 norm = metric.square_root_of_expr(sq)
                 value = self.obj / norm
-                if hint == '+':
-                    return Mv(cosh(norm) + sinh(norm) * value, ga=self.Ga)
+                if (hint=='+') or ((hint is None) and (not sq.is_nonpositive)):
+                    return Mv(simplify(cosh(norm)) + simplify(sinh(norm)) * value, ga=self.Ga)
                 else:
-                    return Mv(cos(norm) + sin(norm) * value, ga=self.Ga)
+                    return Mv(simplify(cos(norm)) + simplify(sin(norm)) * value, ga=self.Ga)
         else:
             # We have to treat this case more generally, by looking at what the
             # higher powers of `self` do.  At some point, they should start
@@ -982,13 +1000,9 @@ class Mv(object):
             i2 = 0 # This will be the index of the first repeat of that first element
             s = nan # This will be the scalar multiple of the repeats
 
-            # TODO: Think more about the upper limit of this range.  It
-            # represents the largest power of `self` for which that power
-            # should be a scalar multiple of some lower power.  I can't think
-            # of any useful example for which it needs to be larger than 4, but
-            # there's no harm making it bigger, unless the algorithm will fail
-            # anyway.
-            for j in range(1,self.Ga.n):
+            if power_search_limit is None:
+                power_search_limit=self.Ga.n
+            for j in range(1,power_search_limit):
                 P.append( P[-1]*self )
                 if P[-1]==S(0):
                     # The series terminates at a finite power, so we can just
@@ -1081,7 +1095,7 @@ class Mv(object):
             if A.obj==S(0) or not self.is_scalar(): # case 0b, case 0c, case 1c
                 return nan # We already know self is not 0
             else: # case 1b
-                return (self.obj / A.obj)
+                return simplify(self.obj / A.obj)
         # The only case left is 2c, which is the interesting one:
         if self.is_blade_rep != A.is_blade_rep:
             self = self.blade_rep()
@@ -1098,7 +1112,7 @@ class Mv(object):
         # nonzero, so we can do this:
         s = simplify(coefs_self[0] / coefs_A[0])
         for i in range(1,len(coefs_self)):
-            if simplify((coefs_self[i] / coefs_A[i]) - s) != 0:
+            if simplify(coefs_self[i] - s * coefs_A[i]) != 0:
                 return nan
         return s
 
