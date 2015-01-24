@@ -1,9 +1,18 @@
 #!/usr/bin/python
 import sys
 
-from sympy import symbols,sin,cos,Rational,expand,collect,Symbol
-from ga import MV,Nga,simplify,Com,ONE,ZERO
-from ga_print import GA_Printer
+from sympy import symbols,sin,cos,Rational,expand,collect,Symbol,nan,S,flatten
+from galgebra.ga import Ga
+from galgebra.mv import Mv, MV, Nga, simplify, Com, ONE, ZERO
+
+## I don't know what happened to this:
+# from ga_print import GA_Printer
+class Printer(object):
+    def on(self):
+        pass
+    def off(self):
+        pass
+GA_Printer = Printer()
 
 HALF = Rational(1,2)
 
@@ -405,4 +414,30 @@ def test_reciprocal_frame_test():
     w = (w.expand()).scalar()
     assert str(simplify(w/Esq)) == '1'
     GA_Printer.off()
+    return
+
+def test_scalar_multiples():
+    (o3d,e1,e2,e3) = Ga.build('e1 e2 e3',g=[1,1,1])
+
+    scalar = Mv(3, ga=o3d)
+
+    for a in [Mv(c,ga=o3d) for c in flatten(o3d.blades)]:
+
+        # Everything should be a multiple of itself
+        s = a.scalar_multiple_of(a)
+        assert s==1
+
+        # No non-scalar blade should be a multiple of a nonzero scalar
+        s = a.scalar_multiple_of(scalar)
+        assert s==nan
+
+        # No nonzero scalar should be a multiple of a non-scalar blade
+        s = scalar.scalar_multiple_of(a)
+        assert s==nan
+
+        # Blades should be scalar multiples of each other if and only if they are equal
+        for b in [Mv(c,ga=o3d) for c in flatten(o3d.blades)]:
+            s = a.scalar_multiple_of(scalar*b)
+            assert (a==b and simplify(1/s - scalar)==0) or (s==nan)
+
     return
