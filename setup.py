@@ -2,18 +2,7 @@
 
 from distutils.core import setup
 from distutils.core import Command
-from distutils.command.build_scripts import build_scripts
-import sys
-import subprocess
 import os
-
-modules = [
-    'galgebra.ga',
-    'galgebra.lt',
-    'galgebra.metric',
-    'galgebra.mv',
-    'galgebra.printer',
-    'galgebra.setgapath']
 
 class clean(Command):
     """Cleans *.pyc and debian trashs, so you should get the same copy as
@@ -40,15 +29,17 @@ class clean(Command):
 
 cmdclass = {'clean': clean}
 
-"""
+with open("README.md", "r") as myfile:
+    long_description = myfile.read()
+
 setup(name='galgebra',
       version='0.4.0',
       description='Symbolic Geometric Algebra/Calculus modules for sympy',
       author='Alan Bromborsky',
       author_email='abrombo@verizon.net',
       license='BSD',
-      packages=['galgebra','examples','tests','doc'],
-      long_description=read('README'),
+      packages=['galgebra'],
+      long_description=long_description,
       classifiers=[
             'Development Status :: 4 - Beta',
             'Environment :: Console',
@@ -59,4 +50,3 @@ setup(name='galgebra',
             'Programming Language :: Python :: 2.7',
             'Topic :: Scientific/Engineering :: Mathematics',
             'Topic :: Scientific/Engineering :: Physics'])
-"""
