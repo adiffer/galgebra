@@ -934,23 +934,32 @@ class Mv(object):
         we can determine if the square is positive or negative and hence if one
         should use trig or hyperbolic functions in the expansion.
 
-        If the square is not a number (but a symbolic expression) .
-
-        Optionally, for backward compatibility, use `hint` to determine which
-        type of functions to use in expansion.  Passing `hint='+'` indicates
-        that the square is positive, and hence hyperbolic functions should be
-        used; anything else indicates that the square is negative, and hence
-        trigonometric functions should be used.
+        If the square is not a number (but a symbolic expression), sympy's
+        standard `is_nonnegative` member is used to determine the sign, which
+        affects whether the result involves hyperbolic or trigonometric
+        functions.  Optionally, for backward compatibility, you may use the
+        argument `hint` to indicate which type of functions should be used in
+        the expansion.  Passing `hint='+'` indicates that the square is
+        positive, and hence hyperbolic functions should be used; anything else
+        indicates that the square is negative, and hence trigonometric
+        functions should be used.
 
         When the square of the input is not a multivector, we try a more
-        general approach, which relies on some power (i2) of the multivector
-        being a scalar multiple of a lower power (i1).  In this case, we can
-        separate the usual series used to define the exponential into series
-        for each term between those two powers, which can be evaluated
-        analytically by sympy.  Note that in this case, sympy may not be good
-        at simplifying the coefficients, and complex numbers may appear.  This
-        does not mean that the coefficients are complex; it simply means that
-        sympy was not able to simplify enough.
+        general approach, which relies on some power of the multivector being a
+        scalar multiple of a smaller power -- which indicates that the series
+        of powers involved in the usual exponential formula will repeat.  In
+        this case, we can separate that series into separate series for each
+        term between those two powers.  Those series are then evaluated
+        analytically by sympy.
+
+        Note that in this case, sympy may not be good at simplifying the
+        coefficients, and complex numbers may appear.  This does not mean that
+        the coefficients are complex; it simply means that sympy was not able
+        to simplify enough.  You may wish to further simplify the result
+        manually.  Also note that this may be slow for very complicated
+        multivectors.  If the multivector is made of a sum of commuting
+        multivectors, it would be better to just exponentiate each separately,
+        and then multiply the results.
 
         The optional argument `power_search_limit` is used when the square of
         the multivector is not a scalar.  The algorithm will search for the
@@ -959,7 +968,8 @@ class Mv(object):
         vector space on which the geometric algebra is based.  If the scalar
         multiple is found at a lower power than the limit, the search stops, so
         there is no particular harm in making the limit quite large, as long as
-        you are confident that the scalar multiple will be found.
+        you are confident that the scalar multiple will be found eventually
+        before reaching the limit.
 
         """
         self_sq = self * self
